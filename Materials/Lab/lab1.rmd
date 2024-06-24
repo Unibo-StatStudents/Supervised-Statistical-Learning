@@ -15,6 +15,8 @@ To visualize the data, we can use the pairs function to plot all the variables a
 pairs(SAheart[,-10], col=ifelse(SAheart$chd==1, "red", "blue"), lwd=1.5)
 ```
 
+- Question: estimate a full logistic regression model with all the predictors.
+
 ## Multiple logistic regression
 Let's estimate a full logistic regression model with all the predictors. 
 
@@ -39,6 +41,8 @@ Although, we can see that some of the coefficients are not statistically relevan
 
 Therefore, we can fit a multiple logistic regression model just with the significant variables, operating a variable selection.
 
+- Question: estimate a new logistic multiple regression model with all the relevant predictors.
+
 ```{R}
 out.log.vs <- glm(chd ~ tobacco + ldl + famhist + typea + age, data = SAheart, family = "binomial")
 summary(out.log.vs)
@@ -57,6 +61,8 @@ And if we observe a tobacco consumption of 1.5,
 $\hat{p}(X) = \frac{e^{-6.44644  + 0.08038 x 1.5}{1 + e ^{-6.44644 + 0.08038 x 1.5}} ~ 0.27$
 
 we can predict that with a 27% of probability the patient will have coronary heart disease.
+
+- Question: estimate the test error of last model via 5-fold cross validation
 
 ## Classification performance via k-fold CV
 
@@ -126,7 +132,7 @@ table(yy.hat, SAheart$chd)
 mean(yy.hat != SAheart$chd)
 ```
 
-## Naive Bayes classifier
+# Naive Bayes classifier
 
 The Naive Bayes model assumes that given a class $Y = h$, the features $X_k$ are independent: 
 $f_h(X) = \prod_{j=1}^{p}f_{hj}(X_j)$. 
@@ -136,6 +142,9 @@ The estimate of the probability density at $x$ is given by:
 $\hat{f}(x) = \frac{1}{nh} \sum_{i}K(\frac{x-X_i}{h})$
 
 where $K$ is the kernel function and $h$ is the bandwidth.
+
+- Question: use 5-fold cv to estimate the test error of the Naive Bayes classifier, with density estimated with both Gaussian and nonparametric 
+    kernel density.
 
 
 To perform it in R we can use klaR library.
@@ -212,8 +221,105 @@ table(y.hat.n, SAheart$chd)
 ```{R}
 mean(err.cv.n)
 ```
-```{R}
 
+
+## k-NN classifier
+
+The k-NN classifier first identifies the neighbors k points in the training data that are closest to $x_0$. Then, it estimates the conditional probability 
+for class $H$ as the fraction of points whose response values equal $h$:
+
+$P(Y=h | X = x_0)=\frac{1}{k}\sum_{i \in N_0}I(y_i = h)$
+
+Finally, k-NN applies Bayes rule and classifies the test observation $x_0$ to the class with the largest probability. 
+
+- Question: divide the dataset into training and validation sets.
+
+As usual, we divide the dataset into training and validation sets.
+
+```{R}
+library(class)
+n <- nrow(SAheart)
+x <- SAheart[,-c(5,10)]
+y <- SAheart[,10]
+```
+
+To divide into training and validation sets we can use the sample function to randomly select half of the observations and assign them to the training set 
+and the other half to the validation set.
+```{R}
+set.seed(1234)
+index <- sample(1:n, ceiling(n/2), replace = F)
+train <- x[index, ]
+train_y <- y[index]
+train_std <- scale(train,T,T)
+ntrain <- nrow(train)
+```
+
+- Question: use 5-fold cv to choose the best number of neighbors among (1,3,5,11,15,25,45,105).
+
+```{R}
+k <- 5
+set.seed(1234)
+folds <- sample(1:k, ntrain, replace = T)  
+table(folds)
+
+```
+```{R}
+v <- c(1,3,5,11,15,25,45,105)
+err_cv <- matrix(NA, k, length(v), dimnames = list(NULL, paste("K=", v)))
+
+for (i in 1:k){
+    x.test <- train_std[folds==i, ]
+    x.train <- train_std[folds!=i, ]
+    y.test <- train_y[folds ==i]
+    y.train <- train_y[folds !=i]
+
+    for(j in 1:length(v)){
+        y.hat <- knn(train = x.train, test = x.test, cl = y.train, k = v[j])
+        err_cv[i,j] <- mean(y.hat != y.test)
+    }
+}
+
+```
+```{R}
+which.min(apply(err_cv, 2, mean))
+```
+```{R}
+best_k <- v[which.min(apply(err_cv, 2, mean))]
+```
+
+- Question: use the validation set to estimate the test error.
+
+## Validation set to estimate the test error
+
+Before estimating the test error on the validation set we need to standardize the latter using information of the training set.
+
+
+```{R}
+mean_x <- colMeans(train)
+sd_x <- apply(train, 2, sd)
+
+test <- x[-index, ]
+test_y <- y[-index]
+
+```
+```{R}
+test_std <- test
+
+for (j in 1:ncol(test)){
+    test_std[,j] <- (test[,j] - mean_x[j])/sd_x[j]
+}
+
+```
+
+## Prediction 
+Now we can make prediction 
+
+```{R}
+y.hat <- knn(train = train_std, test = test_std, cl = train_y, k = best_k)
+table(y.hat,test_y)
+```
+```{R}
+mean(y.hat != test_y)
 ```
 ```{R}
 
@@ -221,27 +327,61 @@ mean(err.cv.n)
 ```{R}
 
 ```
+
 ```{R}
 
 ```
 ```{R}
 
 ```
+
 ```{R}
 
 ```
 ```{R}
 
 ```
+
 ```{R}
 
 ```
 ```{R}
 
 ```
+
 ```{R}
 
 ```
 ```{R}
 
 ```
+
+```{R}
+
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
+
+
