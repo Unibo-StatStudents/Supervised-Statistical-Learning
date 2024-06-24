@@ -1,0 +1,247 @@
+In this lab we are going to explore logistic regression, Naive Bayes and k-NN classifiers.
+
+The dataset used is the SAheart dataset, included in the ElemStatLearn package. 
+
+## Data import
+```{R}
+library(ElemStatLearn)
+data("SAheart")
+summary(SAheart)
+```
+
+## Data visualization
+To visualize the data, we can use the pairs function to plot all the variables against each other.
+```{R}
+pairs(SAheart[,-10], col=ifelse(SAheart$chd==1, "red", "blue"), lwd=1.5)
+```
+
+## Multiple logistic regression
+Let's estimate a full logistic regression model with all the predictors. 
+
+Logistic regression leverages the logistic function, defined as 
+
+$p(X) = \frac{e^{\beta_0 + \beta_1 X}}{1 + e^{\beta_0 + \beta_1 X}}$
+
+And this model can be evaluated via maximum likelihood: i.e., we find the values of $\beta_0$ and $\beta_1$ that maximize the likelihood of the data.
+
+```{R}
+out.log <- glm(chd ~., data = SAheart, family = "binomial")
+summary(out.log)
+```
+To interpret the result remember that: 
+ - if $\beta_1$ is positive then increasing $X$ will be associated with increasing $p(X)$ 
+ - if $\beta_1$ is negative then increasing $X$ will be associated with decreasing $p(X)$
+
+For example the variable $obesity$ has negative coefficient: an increasing value in obesity is associated with a decreasing probability of having a coronary heart disease. 
+Instead, the variable $tobacco$ has positive coefficient: an increasing value in tobacco is associated with an increasing probability of having a corona heart disease.
+
+Although, we can see that some of the coefficients are not statistically relevant. For example, obesity has a p-value of 0.15, which is not significant at the 0.05 level.
+
+Therefore, we can fit a multiple logistic regression model just with the significant variables, operating a variable selection.
+
+```{R}
+out.log.vs <- glm(chd ~ tobacco + ldl + famhist + typea + age, data = SAheart, family = "binomial")
+summary(out.log.vs)
+```
+
+As we can see from the summary, all the variables now are significant and all the regressors appears to have a positive coefficient.
+
+## Making predictions
+
+We can now use the model to make predictions: let's say that we retain just one regressors, the tobacco. 
+
+The model will look like this: 
+$\hat{p}(X) = \frac{e^{\beta_0 + \beta_1 X}{1 + e ^{\beta_0 + \beta_1 X_1}}$, where $X_1$ is the tobacco variable.
+And if we observe a tobacco consumption of 1.5, 
+
+$\hat{p}(X) = \frac{e^{-6.44644  + 0.08038 x 1.5}{1 + e ^{-6.44644 + 0.08038 x 1.5}} ~ 0.27$
+
+we can predict that with a 27% of probability the patient will have coronary heart disease.
+
+## Classification performance via k-fold CV
+
+Now we can take advantage of the k-fold cross validation to compute the performance of the model by computing the test error rate.
+
+First thing that we need to do is to divide our dataset in train and test recursively, since we are going to compute the cross-validation error rate.
+Let's take before the dataset with just the variable selected in the previous point.
+
+```{R}
+x <- subset(SAheart, select = c("chd", "tobacco", "ldl", "famhist", "typea", "age"))
+x
+```
+
+Now we can set the parameters used in the k-fold cross validation.
+```{R}
+k <- 5
+n <- nrow(SAheart)
+set.seed(1234)
+folds <- sample(1:k, n, replace = T)
+```
+Folds is a vector of length n, where each element is a number between 1 and k: we defined like this in order to assign every number to a fold. So, when the iteration starts, the numbers will assign an observation
+either to the train test or the test set.
+
+Now we create empty objects to store the different results. 
+In particular, yy.hat will save values of the predicted response, while the error will store the error rate for each fold.
+
+```{R}
+yy.hat <- rep(NA, n)
+err.cv <- NULL
+```
+
+Now we can start the iteration by assigning the test and train set for each fold. 
+
+The pseudo code will be something like this:
+- start the iteration
+- assign the test to the fold i 
+- assign everything else to the train set (i!=folds)
+- define the y.test as the response variable where the fold is equal to i
+- fit the logistic regression model on the train set
+- predict the response on the test set with the predict function
+- assign the predicted response to y.hat by assigining 1 if the prediction is greater than 0.5, 0 else.
+- compute the error rate by comparing the predicted response with the true response (y.hat != y.test)
+
+```{R}
+for (i in 1:k){
+    x.test <- x[folds==i, ]
+    x.train <- x[folds!=i, ]
+    y.test <- x[folds ==1, 1]
+
+    out.log.cv <- glm(chd ~., data = x.train, family = "binomial")
+    p.hat <- predict(out.log.cv, newdata = x.test, type = "response")
+    y.hat <- ifelse(p.hat>0.5,1,0)
+    err.cv[i] <- mean(y.hat != y.test)
+
+    yy.hat[folds == i] <- y.hat
+
+}
+err.cv
+```
+```{R}
+mean(err.cv)
+```
+```{R}
+table(yy.hat, SAheart$chd)
+```
+```{R}
+mean(yy.hat != SAheart$chd)
+```
+
+## Naive Bayes classifier
+
+The Naive Bayes model assumes that given a class $Y = h$, the features $X_k$ are independent: 
+$f_h(X) = \prod_{j=1}^{p}f_{hj}(X_j)$. 
+
+The estimate of the probability density at $x$ is given by: 
+
+$\hat{f}(x) = \frac{1}{nh} \sum_{i}K(\frac{x-X_i}{h})$
+
+where $K$ is the kernel function and $h$ is the bandwidth.
+
+
+To perform it in R we can use klaR library.
+
+```{R}
+library(klaR)
+```
+
+Now we need to remove the categorical variable and response
+
+```{R}
+n <- nrow(SAheart)
+x <- SAheart[,-c(5,10)]
+y <- SAheart[,10]
+```
+
+Set the k for the k-folds cross validation and divide the train and test iteratively properly with the correct folds.
+
+```{R}
+k <- 5 
+set.seed(1234)
+folds <- sample(1:k, n, replace = T)
+err.cv.k <- NULL
+y.hat.k <- NULL
+```
+To estimate the model by using NaiveBayes function we need to specifiy the train test and the grouping variable: since we want to classify our observations in having or not
+a coronary heart disease, we need to specify the grouping variable as a factor.
+
+To predict the class we can use the predict function and then compute the error rate by comparing the predicted class with the true class.
+
+Remember that with urekernel = TRUE, we are using the kernel density estimation to estimate the probability density function.
+```{R}
+for (i in 1:k){
+    x.test <- x[folds==i, ]
+    x.train <- x[folds!=i, ]
+    y.test <- y[folds ==i]
+    y.train <- y[folds !=i]
+
+    out.bay.k <- NaiveBayes(x = x.train, grouping = as.factor(y.train), userkernel = TRUE)
+    pred.cl.k <- predict(out.bay.k, newdata = x.test)$class
+    y.hat.k[folds == i] <- pred.cl.k
+
+    err.cv.k[i] <- mean(pred.cl.k!=y.test)
+}
+```
+```{R}
+table(y.hat.k, SAheart$chd)
+```
+```{R}
+mean(err.cv.k)
+```
+
+Let's perform the same model but without the kernel density estimation, so setting userkernel = FALSE a normal density is estimated.
+```{R}
+err.cv.n <- NULL
+y.hat.n <- NULL
+
+for(i in 1:k){
+    x.test <- x[folds==i, ]
+    x.train <- x[folds!=i, ]
+    y.test <- y[folds ==i]
+    y.train <- y[folds !=i]
+
+    out.bay.n <- NaiveBayes(x = x.train, grouping = as.factor(y.train), userkernel = FALSE)
+    pred.cl.n <- predict(out.bay.n, newdata = x.test)$class
+    y.hat.n[folds==i] <- pred.cl.n
+
+    err.cv.n[i] <- mean(pred.cl.n!=y.test)
+}
+```
+```{R}
+table(y.hat.n, SAheart$chd)
+```
+```{R}
+mean(err.cv.n)
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
