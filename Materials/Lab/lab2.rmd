@@ -1,0 +1,316 @@
+# Lab2
+
+In this lab we are going to explore Linear Discriminant analysis and Linear Model Selection. 
+
+
+## Linear Discriminant Analysis
+
+We are going to use the SAheart dataset, included in the ElemStatLearn package. This dataset contains information about 462 patients,
+including whether they have coronary heart disease (chd). 
+
+- Question: divide the dataset into training and validation set.
+
+Whenever it's asked to divide the dataset in train and test is sufficient to create an index which will be assigned randomly to half of the observations
+of the dataset to define the training set. The other half will be the test set.
+
+```{R}
+library(ElemStatLearn)
+data(SAheart)
+summary(SAheart)
+```
+```{R}
+set.seed(1234)
+n <- nrow(SAheart)
+index <- sample(1:n, ceiling(n/2), replace = FALSE) 
+```
+
+```{R}
+train <- SAheart[index,]
+test <- SAheart[-index,]
+```
+
+- Question: perform Linear Discriminant Analysis to predict variable chd and compute the test error estimate on the validation set.
+
+To perform LDA we can use the lda function from the MASS package. The lda function requires the formula of the model and the training set as input.
+```{R}
+library(MASS)
+out.lda <- lda(chd ~., data = train)
+out.lda
+```
+```{R}
+yhat <- predict(out.lda, newdata = test)$class
+table(yhat, test$chd)
+```
+```{R}
+mean(yhat != test$chd)
+```
+
+- Question: how does it compare with the logistic regression?
+
+Let's fit now a logistic regression and compare the test error rate  with the one obtained with LDA.
+We fit it on the training set, in order to be able to make prediction with the test set.
+```{R}
+out.log <- glm(chd~., data = train, family = binomial)
+summary(out.log)
+```
+Now we can use the fitted model to make predictions with the predict function: the predict function, although, gives us probability and not class. 
+So, we can use a threshold of 0.5 to assign the class.
+```{R}
+pred.out.log <- predict(out.log, newdata = test, type = "response")
+yhat.log <- ifelse(pred.out.log > 0.5, 1, 0)
+
+```
+```{R}
+table(yhat.log, test$chd)
+mean(yhat.log != test$chd)
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+
+## Linear Model Selection
+
+Let's now consider the prostate dataset from the ElemStatLearn package. This dataset contains information about 97 patients with prostate cancer.
+
+- Question: perform model selection via best subset, forward selection, backward elimination and hybrid methods.
+
+```{R}
+library(ElemStatLearn)
+data(prostate)
+summary(prostate)
+```
+In this dataset the last column is a variable that helps us to divide the train and test. But we will not use it.
+So, we can remove it from the dataset, the new dataset is called x. 
+Then, the number of predictors is p, which is the number of columns minus 1 since the last column is the response variable (lpsa).
+```{R}
+x <- prostate[,-ncol(prostate)]
+p <- ncol(x)-1
+```
+Now, to perform the model selection we can use the regsubsets function from the leaps package.
+```{R}
+library(leaps)
+```
+
+### Best subset selection
+We can use the regsubsets function as we used lm/glm: so, it sufficient to specify the formula and the dataset.
+```{R}
+regfit.full <- regsubsets(lpsa~., data = x)
+summary(regfit.full)
+```
+
+### Forward selection
+
+
+```{R}
+regfit.forward <- regsubsets(lpsa~., data = x, method = "forward") 
+summary(regfit.forward)
+```
+
+## Backward elimination
+
+```{R}
+regfit.backward <- regsubsets(lpsa~., data = x, method = "backward")
+summary(regfit.backward)
+```
+
+
+Let's choose among the models obtained using the validation set approach.
+
+```{R}
+set.seed(1234)
+train <- sample(c(TRUE, FALSE), nrow(x), replace = TRUE)
+test <- !train
+```
+```{R}
+regfit.best <- regsubsets(lpsa~., data = x[train,])
+summary(regfit.best)
+```
+
+```{R}
+test.mat <- model.matrix(lpsa~., data=x[test,])
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+
+```{R}
+
+```
+```{R}
+
+```
