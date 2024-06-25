@@ -1,0 +1,353 @@
+# Lab 4
+
+## Decision trees
+
+With decision trees we can perform both classification and regression tasks: we will focus now on regression trees.
+
+### Regression trees
+
+Let's considere the prostate dataset from the ElemStatLearn package
+
+```{R}
+library(ElemStatLearn)
+data(prostate)
+summary(prostate)
+```
+
+The goal is to predict lpsa from a number of measurements. 
+
+- Question: build a regression tree on a subset of the original dataset. 
+
+Let's define the dataset properly:
+
+```{R}
+x <- prostate[,-ncol(prostate)]
+p <- ncol(x)-1
+n <- nrow(x)
+```
+
+Now we can split in train and test for estimating the error in a validation set approach
+
+```{R}
+set.seed(1234)
+index <- sample(1:n, ceiling(n/2), replace = FALSE)
+train <- x[index,]
+test <- x[-index,]
+```
+
+With the tree function we can now fit a regression tree. 
+The tree function takes in input the usual relationship between the regressors and the response variable: 
+$lpsa~., $. Moreover, we need to define the dataset used ($x$ in this case) and the training subset for which we want to 
+build the tree. In $subset$ parameter we need to assign the the index which allocate the corresponding observations to the training set.
+Therefore is sufficient to sample half of the observations randomly using the sample function as we did in the previous chunk with the sample
+function. 
+```{R}
+library(tree)
+tree.out <- tree(lpsa~., x, subset = index)
+summary(tree.out)
+```
+
+As we can see from the output, just 4 variables have been used to construct the tree.
+
+```{R}
+tree.out
+```
+```{R}
+plot(tree.out)
+plot(tree.out, pretty=0, digits=3)
+```
+To compute the test error rate we need to make predictions on the test set and compute the mean squared error rate.
+So, we are going to use the predict function.
+
+```{R}
+tree.pred <- predict(tree.out, newdata = test)
+```
+And now it's sufficient to compute the MSE
+```{R}
+mse.tree <- mean((tree.pred - test$lpsa)^2)
+```
+
+#### Pruning 
+Now the request is to prune the tree and estimate again the test error.
+
+So, we can do it by performing 5-fold cross validation in order to estimate the cv MSE of the trees as a 
+function of $\alpha$. 
+
+Luckily, there is a function that does it almost immediately, cv.tree(): it determines the optimal level of tree complexity.
+
+```{R}
+set.seed(1234)
+cvtree.prostate <- cv.tree(tree.out, K = 5, FUN = prune.tree)
+cvtree.prostate
+```
+
+We can now take the best tree size, the one which minimizes the deviance:
+```{R}
+best.terminal <- cvtree.prostate$size[which.min(cvtree.prostate$dev)]
+best.terminal
+```
+
+We can prune the tree with prune.tree function
+```{R}
+prune.prostate <- prune.tree(tree.out, best = best.terminal)
+plot(prune.prostate)
+text(prune.prostate, pretty = 0)
+```
+
+And finally compute the cross-validation error rate
+
+```{R}
+cv.tree.pred <- predict(prune.prostate, newdata = test)
+```
+```{R}
+mean((cv.tree.pred-test$lpsa)^2)
+```
+
+### Classification trees
+
+To perform classification trees we are going to use the SAheart dataset: the data represent white males between 15 and 64 and the response variable is the presence or absence
+of myocardial
+```{R}
+data(SAheart)
+n <- nrow(SAheart)
+x <- SAheart[, -ncol(SAheart)]
+y <- SAheart[, ncol(SAheart)]
+```
+
+To use the tree function to fit a classification tree we need to convert the dataset in a dataframe and set the response variable as a factor
+
+```{R}
+heart <- data.frame(chd=as.factor(y),x)
+```
+
+Now we can divide the dataframe in train and test as usual
+
+```{R}
+set.seed(1234)
+index <- sample(1:n, ceiling(n/2), replace = FALSE)
+train <- heart[index,]
+test <- heart[-index,]
+```
+And as we did before for the regression tree we can apply the tree function by specifing the chd variable as response and the subset used, i.e. the index previously defined
+```{R}
+tree.class.out <- tree(chd ~., data = heart, subset = index)
+summary(tree.class.out)
+```
+It's time to plot the classification tree
+```{R}
+plot(tree.class.out)
+text(tree.class.out, pretty = 0)
+```
+
+And we can finally compute the test error rate by leveraging the predict function
+
+```{R}
+yhat.tree.class <- predict(tree.class.out, newdata = test, type = "class")
+table(yhat.tree.class, test$chd)
+```
+To compute the misclassification error rate, we define the following function
+```{R}
+misc <- function(yhat, y){
+    if (length(table(yhat))!= length(table(y)))
+        stop("The levels of the two vectors do not match")
+    1-sum(diag(table(yhat,y)))/length(y)
+}
+```
+Applied to our analysis
+```{R}
+1- misc(yhat.tree.class, test$chd)
+```
+Or equivalently,
+```{R}
+1-mean(yhat.tree.class!=test$chd)
+```
+
+#### Pruning the classification tree
+To prune the tree, in order to improve the results by reducing the complexity of the tree, we perform a cross validation in order to find the optimal 
+level of tree complexity. 
+Since we are in a classification task, we use the argument FUN=prune.misclass to indicate that we want the classification error rate to guide the corss-validation 
+and pruning process.
+
+```{R}
+set.seed(1234)
+cv.heart <- cv.tree(tree.class.out, FUN = prune.misclass)
+cv.heart
+```
+We can select the minimum deviance reached 
+```{R}
+best.tree.class <- cv.heart$size[which.min(cv.heart$dev)]
+```
+Now we can use the previous result to prune the tree with the best cut
+```{R}
+prune.class.heart <- prune.misclass(tree.class.out, best = best.tree.class)
+plot(prune.class.heart)
+text(prune.class.heart, pretty = 0)
+```
+The usual question that arise now is how well the pruned tree performs on the test set. 
+```{R}
+tree.class.pred <- predict(tree.class.out, newdata = test, type = "class")
+table(tree.class.pred, test$chd)
+```
+Let's check the misclassification error rate
+```{R}
+1-misc(tree.class.pred, test$chd)
+```
+
+
+## Bagging regression
+
+Let's now perform baggin on the prostate dataset and estimate the test error.
+
+Since bagging is a special case of a random forest (when $m=p$), we can use the randomForest() function to perform both random forest and bagging.
+```{R}
+data(prostate)
+dim(prostate)
+```
+Let's specify the regressors and the response variable
+```{R}
+x <- prostate[,-ncol(prostate)]
+p <- ncol(x)-1
+n <- nrow(x)
+```
+Divide in train and test as usual
+```{R}
+set.seed(1234)
+
+index <- sample(1:n, ceiling(n/2), replace = FALSE)
+train <- x[index,]
+test <- x[-index,]
+```
+Perform bagging with the randomForest function, by specifing $mtry=p$
+```{R}
+library(randomForest)
+set.seed(1234)
+bag.prostate <- randomForest(lpsa~., data = x, subset = index, mtry=p, importance = TRUE)
+bag.prostate
+```
+We can also see the importance of every variable in the tree construction
+```{R}
+importance(bag.prostate)
+varImpPlot(bag.prostate)
+```
+
+The bagging tree fitted now can be used to make predictions on the test set
+```{R}
+bag.pred.out <- predict(bag.prostate, newdata = test)
+bag.pred.out
+```
+And finally we can compute the MSE
+```{R}
+mse.bag.reg <- mean((bag.pred.out- test$lpsa)^2)
+mse.bag.reg
+```
+
+## RandomForest regression
+
+Let's now perform properly a RandomForest for a regression task: using the same dataset as before it's sufficient to change the mtry parameter in the randomForest function.
+```{R}
+rf.reg.out <- randomForest(lpsa~., data = x, subset = index, mtry = sqrt(p), importance = TRUE)
+rf.reg.out
+```
+```{R}
+importance(rf.reg.out)
+varImpPlot(rf.reg.out)
+```
+And use the fitted model to make predictions on the test set
+```{R}
+rf.reg.pred <- predict(rf.reg.out, newddata = test)
+rf.reg.pred
+```
+Let's check the MSE
+```{R}
+mean((rf.reg.pred-test$lpsa)^2)
+```
+
+## Bagging classification
+
+Let's now perform a RandomForest for a classification task: using the SAheart dataset as before, we need to convert the response variable in a factor.
+
+```{R}
+library(randomForest)
+data(SAheart)
+```
+```{R}
+x <- SAheart[, -ncol(SAheart)]
+y <- SAheart[, ncol(SAheart)]
+
+heart <- data.frame(chd=as.factor(y), x)
+```
+```{R}
+n <- nrow(heart)
+
+set.seed(1234)
+
+index <- sample(1:n, ceiling(n/2), replace =FALSE)
+
+heart.train <- heart[index,]
+heart.test <- heart[-index,]
+```
+```{R}
+set.seed(1234)
+
+bag.heart <- randomForest(chd~., data = heart, subset = index, mtry=p-1, importance = TRUE)
+bag.heart
+```
+
+```{R}
+importance(bag.heart)
+varImpPlot(bag.heart)
+```
+
+We can now predict the response variable on the test set and compute the misclassification error rate
+```{R}
+pred.bag.heart <- predict(bag.heart, newdata = heart.test, type = "class")
+table(pred.bag.heart, heart.test$chd)
+```
+```{R}
+mean(pred.bag.heart!=heart.test$chd)
+```
+
+## RandomForest classification
+
+Let's apply the randomForest model 
+```{R}
+set.seed(1234)
+rand.for.heart <- randomForest(chd~., data = heart, subset = index, mtry = sqrt(ncol(x)), importance = TRUE)
+rand.for.heart
+```
+Let's predict on the test set
+```{R}
+pred.rand.for.heart <- predict(rand.for.heart, newdata = heart.test, type= "class")
+table(pred.rand.for.heart, heart.test$chd)
+```
+and the misclassification error is
+```{R}
+mean(pred.rand.for.heart!= heart.test$chd)
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
