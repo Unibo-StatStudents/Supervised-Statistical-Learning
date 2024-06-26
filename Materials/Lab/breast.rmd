@@ -1,0 +1,182 @@
+# Breast exercise
+
+In this exercise we are going to classify breast cancer in malignant/bening
+
+```{R}
+load("/Users/albertotrashaj/Desktop/Supervised-Statistical-Learning/Materials/datasets/breast.RData")
+```
+
+The dataset has been already divided in train and test
+```{R}
+library(klaR)
+dim(dta.test)
+dim(dta.train)
+
+```
+We're asked to find the optimal method between Gaussian and kernel density estimator for the Naive Bayes classifier.
+
+So, let's compare the cv-error of the two methods, but before let's organize the data in the right format.
+
+```{R}
+y <- as.factor(dta.train$Class)
+x.train <- as.matrix(dta.train[,-c(1,11)])
+x.test <- as.matrix(dta.test[,-c(1,ncol(dta.test))])
+```
+Now we can proceed with the cross-validation loop on the training set.
+
+```{R}
+k <- 5
+set.seed(1234)
+err.nb<-matrix(NA,k,2, dimnames=list(NULL,c("Gaussian","Kernel")))
+```
+
+```{R}
+k <- 5
+set.seed(1234)
+err.nb <- matrix(NA, k, 2, dimnames = list(NULL, c("Gaussian", "Kernel")))
+
+# Check the dimensions of x.train
+print(dim(x.train))
+
+set.seed(1234)
+folds <- sample(1:k, nrow(x.train), replace = TRUE)
+
+# Check the length of folds
+print(length(folds))
+
+for (i in 1:k) {
+    cat("Fold:", i, "\n")
+    xx.tr <- x.train[folds != i,]
+    xx.te <- x.train[folds == i,]
+    yy.tr <- y[folds != i]
+    yy.te <- y[folds == i]
+    
+    cat("Training set size:", nrow(xx.tr), "\n")
+    cat("Test set size:", nrow(xx.te), "\n")
+    
+    naiv.gaussian <- NaiveBayes(x = xx.tr, grouping = as.factor(yy.tr), userkernel = FALSE)
+    naiv.kernel <- NaiveBayes(x = xx.tr, grouping = as.factor(yy.tr), userkernel = TRUE)
+    
+    pred.gauss <- predict(naiv.gaussian, newdata = xx.te)$class
+    pred.kernel <- predict(naiv.kernel, newdata = xx.te)$class
+    
+    err.nb[i, 1] <- mean(pred.gauss != yy.te)
+    err.nb[i, 2] <- mean(pred.kernel != yy.te)
+}
+
+err.nb
+
+```
+
+
+### Ex2
+
+Choose the optimal $k$ among $r ={1,3,5,15}$ in k-NearestNeighbor classifier. 
+
+Let's first import the library used for the knn function
+```{R}
+library(class)
+```
+Define the array of possible values 
+```{R}
+r <- c(1,3,5,15)
+```
+```{R}
+x <- as.matrix(dta.train[, -c(1,11)])
+y <- as.factor(dta.train$Class)
+```
+```{R}
+k <- 5 
+set.seed(1234)
+folds <- sample(1:k, nrow(x), replace = TRUE)
+```
+
+
+```{R}
+err.cv.matrix <- matrix(NA, k, length(r), dimnames = list(NULL, as.character(r)))
+x.std<- scale(x)
+for (i in 1:k){
+    xtrain <- x.std[folds!=i,]
+    xtest <- x.std[folds==i,]
+    ytrain <- y[folds!=i]
+    ytest <- y[folds==i]
+    
+    for (j in 1:length(r)){
+        pred.y <- knn(train = xtrain, test = xtest, cl = ytrain, k = r[j])
+        err.cv.matrix[i,j] <- mean(pred.y != ytest)
+    }
+}
+means <- colMeans(err.cv.matrix)
+```
+
+### Ex 3 
+
+Now we are going to apply Lasso regression and the aim is to find the optimal $\lambda$.
+
+We are going to use glmnet library.
+```{R}
+library(glmnet)
+```
+To apply the glmnet function, we define $x$ and $y$ as the data matrix and the response variable.
+```{R}
+x <- as.matrix(dta.train[,-c(1,11)])
+y <- as.factor(dta.train$Class)
+```
+Since the goal here is to find the optimal $\lambda$ value we can directly use the $cv.glmnet$ function. 
+In the cv.glmnet we need to specify the folds used and the family. 
+We can create the folds as usual, and since it is a classification task the family is the $binomial$
+
+```{R}
+k <- 5
+folds <- sample(1:k, nrow(x), replace = TRUE)
+cv.out <- cv.glmnet(x = x, y = y, foldid = folds, family = "binomial")
+```
+The cv.out object gives us the lambda which minimizes a measure (deviance, ecc...)
+```{R}
+best.lambda <- cv.out$lambda.min
+best.lambda
+```
+We can finally use the best $\lambda$ value to predict using Lasso regression.
+```{R}
+lasso.pred <- predict(cv.out, s = best.lambda, newx = x.test, type = "class")
+lasso.pred
+```
+Now it's possible to compare the predicted values with the real ones
+```{R}
+lasso.error <- mean(lasso.pred != dta.test$Class)
+```
+
+### Summarizing
+
+In this exercise we applied three different methods to classify tumors. 
+We take in vault the part of the dataset which can be used to test the models to find the best one. 
+The best one is defined by the model which minimizes the misclassification error. 
+
+I wrote this function since we are going to use it for all the methods.
+```{R}
+misc <- function(yhat, y){
+    mean(yhat!=y)
+}
+```
+
+#### Naive Bayes
+
+We found that the best model among the Naive Bayes methods is the one that uses the kernel and not the Gaussian assumption.
+
+```{R}
+set.seed(1234)
+naive.out <- NaiveBayes(x = as.matrix(dta.train[,-c(1,11)]), grouping = as.factor(dta.train$Class), userkernel=TRUE)
+naive.out
+```
+Let's predict on the unseen dataset
+```{R}
+set.seed(1234)
+naive.prediction <- predict(naive.out, newdata = as.matrix(dta.test[,-c(1,11)]))$class
+```
+and compute the misclassification error
+```{R}
+naive.error <- misc(naive.prediction,dta.test$Class)
+```
+```{R}
+
+```

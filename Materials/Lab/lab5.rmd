@@ -1,0 +1,177 @@
+# Boosting and Support Vector Machines
+
+We are going to fit boosted classification trees to the SAheart data set.
+
+```{R}
+library(ElemStatLearn)
+data(SAheart)
+n <- nrow(SAheart)
+x <- SAheart[,-ncol(SAheart)]
+y <- SAheart[,ncol(SAheart)]
+```
+Now we put the dataset in a dataframe format
+```{R}
+heart <- data.frame(chd=y, x)
+```
+and define a misclassification function, which is computed by taking the mean of the number of misclassified prediction.
+```{R}
+misc <- function(yhat, y){
+    mean(yhat!=y)
+}
+```
+
+The function used is the gbm() contained in the gbm package. Since it's a binary classification we set the parameter $distribution="bernoulli"$.
+
+```{R}
+library(gbm)
+```
+Now we divide in train and test set
+```{R}
+set.seed(1234)
+index <- sample(1:n, ceiling(n/2), replace = FALSE)
+train <- heart[index,]
+test <- heart[-index,]
+```
+and finally apply gbm function on the training set
+```{R}
+boost.out <- gbm(chd~., distribution="bernoulli", data = train, n.trees = 50, interaction.depth = 1, bag.fraction = 1)
+boost.out
+```
+Since the number of trees is a tunable parameter we can tune it via 5-fold CV. 
+
+```{R}
+set.seed(1234)
+k <- 5 
+folds <- sample(1:k, length(index), replace = T)
+table(folds)
+```
+
+Let's say that we need to tune the number of trees choosing among $B=(25,50,100,150)$
+
+```{R}
+B <- c(25,50,100,150)
+```
+So, for every value in the B vector we need to store the cross-validation error.
+```{R}
+err.cv <- matrix(NA, k, length(B))
+```
+
+We can start now the loop
+```{R}
+set.seed(1234)
+for (i in 1:k){
+    x.test <- heart[folds==i,]
+    x.train <- heart[folds!=i,]
+    for (j in 1:length(B)){
+        boost.out <- gbm(chd~., x.train, distribution = "bernoulli", n.trees = B[j], interaction.depth = 1, bag.fraction = 1)
+        p.hat <- predict(boost.out, newdata = x.test, n.trees = B[j], type="response")
+        yhat <- ifelse(p.hat >0.5,1,0)
+        err.cv[i,j] <- misc(yhat, x.test$chd)
+    }
+}
+```
+```{R}
+colMeans(err.cv)
+```
+
+We can use the best number of trees, the one which minimizes the error.
+```{R}
+b_best <- B[which.min(colMeans(err.cv))]
+```
+And fit it into the training set
+```{R}
+boost.heart.best <- gbm(chd~., train, distribution="bernoulli", n.trees = b_best, interaction.depth = 1, bag.fraction=1)
+p.hat <- predict(boost.heart.best , newdata = test, type = "response", n.trees= b_best)
+yhat <- ifelse(p.hat > 0.5,1,0)
+
+table(yhat, test$chd)
+```
+```{R}
+mean(yhat!=test$chd)
+```
+```{R}
+
+```
+
+## Support Vector Machines
+
+We are going to fit a support vector machine to the SAheart data set. We will use the svm() function from the e1071 package. 
+
+```{R}
+library(ElemStatLearn)
+library(e1071)
+```
+```{R}
+data(SAheart)
+n <- nrow(SAheart)
+x <- SAheart[,-ncol(SAheart)]
+y <- SAheart[,ncol(SAheart)]
+```
+```{R}
+heart <- data.frame(y=as.factor(y),x)
+set.seed(1234)
+index <- sample(1:n, ceiling(n/2), replace = FALSE)
+train <- heart[index,]
+test <- heart[-index,]
+```
+```{R}
+smv.fit <- svm(y~., data = heart, subset = index, kernel = "linear", cost = 10)
+smv.fit
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```

@@ -1,0 +1,88 @@
+# Colon exercise
+
+In this exercise we are going to find the best classifier: the dataset contains gene expression data (2000 genes from 62 samples)
+
+```{R}
+load("/Users/albertotrashaj/Desktop/Supervised-Statistical-Learning/Materials/datasets/colon_data.RData")
+```
+The dataset has been already divided in train and test and we can see their dimension here
+```{R}
+dim(train)
+dim(test)
+```
+
+## Logistic regression
+
+Let's try to apply the first classifier, the logistic regression: we perform a Leave-One-Out-CV on the training set. 
+This means that we fit the lm function on the data taking out just one observation.
+
+```{R}
+y.lg.train <- rep(NA, nrow(train))
+
+for (i in 1:nrow(train)){
+    out.lr <- glm(y~., family = "binomial", data = train[-i,]) #take one observation out
+    phat <- predict(out.lr, newdata = train[i,], type="response") #put an observation in
+    y.lg.train[i] <- ifelse(phat>0.5,1,0)
+}
+table(y.lg.train,train$y)
+```
+And we can compute the mean by simply
+```{R}
+lg.error <- mean(y.lg.train!=train$y)
+lg.error
+```
+
+## k-NN
+
+Let's apply the k-NN now, remember to standardize the data.
+
+```{R}
+library(class)
+train_std<-scale(train[,-1],T,T)
+mean_tr<-colMeans(train[,-1])
+sd_tr<-apply(train[,-1],2,sd)
+mean_tr.m<-matrix(mean_tr,nrow(test),ncol(test[,-1]),byrow=T)
+sd_tr.m<-diag(sd_tr)
+```
+
+```{R}
+test_std<-as.matrix(test[,-1]-mean_tr.m)%*%solve(sd_tr.m)
+k<-c(1,3,5,7,9,11,13,15)
+err.cv<-matrix(NA,nrow(train),length(k),dimnames=list(NULL,paste0("k=",k)))
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
+```{R}
+
+```
